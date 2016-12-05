@@ -66,6 +66,7 @@ set(glfw_LIBRARIES glfw)
 # List all source/header files
 set(source_files
  ${CMAKE_SOURCE_DIR}/src/Main.cpp
+ ${CMAKE_SOURCE_DIR}/src/HelloTriangleApplication.h
 )
 source_group(src      FILES ${source_files})
 
