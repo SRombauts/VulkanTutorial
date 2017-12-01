@@ -11,7 +11,16 @@ Copyright (c) 2017 Sébastien Rombauts (sebastien.rombauts@gmail.com)
 
 ## Building with CMake
 
-find_package(Vulkan) requires CMake 3.7, but I have added the FindVulkan.cmake module in the source tree. 
+find_package(Vulkan) requires CMake 3.7, but I have added the FindVulkan.cmake module in the source tree.
+
+Dependencies:
+
+- glfw   Windowing library is provided as a submodule
+- glm    Math matrix/vector library is provided as a submodule
+
+GLFW require the installation of the following:
+
+ sudo apt-get install libvulkan-dev libxrandr-dev libxinerama-dev libxcursor-dev 
 
 ### Get glm and glfw submodules
 

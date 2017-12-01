@@ -40,6 +40,29 @@ endif (MSVC)
 set(CPPLINT_ARG_LINELENGTH "--linelength=120")
 set(CPPLINT_ARG_VERBOSE    "--verbose=1")
 
+
+# Search for Vulkan SDK
+message(STATUS "ENV{VULKAN_SDK}: '$ENV{VULKAN_SDK}'")
+find_package(Vulkan)
+if (NOT VULKAN_FOUND)
+    message(FATAL_ERROR "Could not find Vulkan library!")
+else ()
+    message(STATUS "Vulkan_INCLUDE_DIRS: '${Vulkan_INCLUDE_DIRS}' Vulkan_LIBRARIES: '${Vulkan_LIBRARIES}'" )
+endif ()
+include_directories(SYSTEM ${Vulkan_INCLUDE_DIRS})
+
+# GLM (vector/matrix math) is a header only library, no need to build it, so not using add_subdirectory(glm)
+include_directories(SYSTEM glm)
+
+# Compole GLFW, before activation of maximum warnings bellow 
+set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+add_subdirectory(glfw)
+include_directories(SYSTEM glfw/include)
+set(glfw_LIBRARIES glfw)
+
+
 # List all source/header files
 set(source_files
  ${CMAKE_SOURCE_DIR}/src/Main.cpp

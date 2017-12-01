@@ -1,16 +1,22 @@
 # Copyright (c) 2012-2017 Sebastien Rombauts (sebastien.rombauts@gmail.com)
 
-# Run on the default infrastructure, which is Container Based Ubuntu 14.04
-#sudo: false
-
-cache:
-  apt: true
+# Request Ubuntu 14.04 VM
+sudo: required
+dist: trusty
 
 language: cpp
 
 compiler:
   - clang
   - gcc
+
+install:
+  - sudo apt-get -qq update
+  - sudo apt-get install -y libxrandr-dev libxinerama-dev libxcursor-dev 
+  - wget -O vulkansdk-linux-x86_64.run https://vulkan.lunarg.com/sdk/download/1.0.65.0/linux/vulkansdk-linux-x86_64.run
+  - chmod ugo+x vulkansdk-linux-x86_64.run
+  - ./vulkansdk-linux-x86_64.run
+  - export VULKAN_SDK=$TRAVIS_BUILD_DIR/VulkanSDK/1.0.65.0/x86_64
 
 # scripts to run before build
 before_script:
