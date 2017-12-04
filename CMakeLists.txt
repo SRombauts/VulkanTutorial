@@ -71,8 +71,11 @@ source_group(src      FILES ${source_files})
 
 # List script files
 set(script_files
+ ${CMAKE_SOURCE_DIR}/.travis.yml
+ ${CMAKE_SOURCE_DIR}/appveyor.yml
  ${CMAKE_SOURCE_DIR}/build.bat
  ${CMAKE_SOURCE_DIR}/build.sh
+ ${CMAKE_SOURCE_DIR}/Doxyfile
 )
 source_group(scripts  FILES ${script_files})
 
