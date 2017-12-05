@@ -17,6 +17,47 @@
 #include <stdexcept>
 #include <vector>
 #include <functional>
+#include <cstring>
+
+const int WIDTH = 800;  ///< Width of our window
+const int HEIGHT = 600; ///< Height of our window
+
+/// Enable Validation Layers only on Debug build
+#ifdef NDEBUG
+const bool enableValidationLayers = false;
+#else
+const bool enableValidationLayers = true;
+#endif
+
+/// Names of validation layers that we would like to enable
+const std::vector<const char*> validationLayers = {
+    "VK_LAYER_LUNARG_standard_validation"
+};
+
+/// Load the Debug callback extension and call it to register our callback
+VkResult CreateDebugReportCallbackEXT(
+    VkInstance instance,
+    const VkDebugReportCallbackCreateInfoEXT* pCreateInfo,
+    const VkAllocationCallbacks* pAllocator,
+    VkDebugReportCallbackEXT* pCallback) {
+    auto func = (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
+    if (func != nullptr) {
+        return func(instance, pCreateInfo, pAllocator, pCallback);
+    } else {
+        return VK_ERROR_EXTENSION_NOT_PRESENT;
+    }
+}
+
+/// Load the destroy Debug callback extension and call it to unregister our callback
+void DestroyDebugReportCallbackEXT(
+    VkInstance instance,
+    VkDebugReportCallbackEXT callback,
+    const VkAllocationCallbacks* pAllocator) {
+    auto func = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
+    if (func != nullptr) {
+        func(instance, callback, pAllocator);
+    }
+}
 
 /**
  * Vulkan Tutorial Application 
@@ -39,7 +80,7 @@ private:
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-        std::cout << "Create a " << WIDTH << " x " << HEIGHT << " window\n";
+        std::cout << "[Init] Create a " << WIDTH << " x " << HEIGHT << " window\n";
         window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
         if (!window) {
             throw std::runtime_error("Cannot create the Window");
@@ -49,17 +90,21 @@ private:
     /// Initialize the Vulkan renderer
     void initVulkan() {
         createInstance();
+        setupDebugCallback();
     }
 
     /// Create a Vulkan instance
     void createInstance() {
+        if (enableValidationLayers && !checkValidationLayerSupport()) {
+            throw std::runtime_error("validation layers requested, but not available!");
+        }
+
         uint32_t extensionCount = 0;
         vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
-
         std::vector<VkExtensionProperties> extensions(extensionCount);
         vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
 
-        std::cout << "There are " << extensionCount << " available Vulkan extensions:\n";
+        std::cout << "[Init] There are " << extensionCount << " available Vulkan extensions:\n";
         for (const auto& extension : extensions) {
             std::cout << "\t" << extension.extensionName << std::endl;
         }
@@ -72,36 +117,140 @@ private:
         appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.apiVersion = VK_API_VERSION_1_0;
 
-        uint32_t glfwExtensionCount = 0;
-        const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-        std::cout << "GLFW requires the following " << glfwExtensionCount << " extensions:\n";
-        for (size_t i = 0; i < glfwExtensionCount; ++i) {
-            std::cout << "\t" << glfwExtensions[i] << std::endl;
+        const auto requiredExtensions = getRequiredExtensions();
+        std::cout << "[Init] GLFW requires the following " << requiredExtensions.size() << " extensions:\n";
+        for (const auto& requiredExtension : requiredExtensions) {
+            std::cout << "\t" << requiredExtension << std::endl;
         }
 
         VkInstanceCreateInfo createInfo = {};
         createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
         createInfo.pApplicationInfo = &appInfo;
-        createInfo.enabledExtensionCount = glfwExtensionCount;
-        createInfo.ppEnabledExtensionNames = glfwExtensions;
-        createInfo.enabledLayerCount = 0;
+        createInfo.enabledExtensionCount = requiredExtensions.size();
+        createInfo.ppEnabledExtensionNames = requiredExtensions.data();
+        if (enableValidationLayers) {
+            createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+            createInfo.ppEnabledLayerNames = validationLayers.data();
+        } else {
+            createInfo.enabledLayerCount = 0;
+        }
 
         if (VK_SUCCESS != vkCreateInstance(&createInfo, nullptr, &instance)) {
             throw std::runtime_error("Cannot create the Vulkan instance");
         }
     }
 
+    /// @return true  if our Vulkan SDK provides the validation layers we would like to use
+    bool checkValidationLayerSupport() {
+        bool allLayersFound = true;
+        uint32_t layerCount;
+        vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+        std::vector<VkLayerProperties> availableLayers(layerCount);
+        vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+        std::cout << "[Init] There are " << layerCount << " available validation layers:\n";
+        for (const auto& layer : availableLayers) {
+            std::cout << "\t" << layer.layerName << std::endl;
+        }
+
+        for (const char* layerName : validationLayers) {
+            bool layerFound = false;
+
+            for (const auto& layer : availableLayers) {
+                if (strcmp(layerName, layer.layerName) == 0) {
+                    layerFound = true;
+                    break;
+                }
+            }
+
+            if (!layerFound) {
+                std::cerr << "[init] Missing validation layer " << layerName << std::endl;
+                allLayersFound = false;
+            }
+        }
+
+        return allLayersFound;
+    }
+
+    /// @return List of required Vulkan extensions
+    std::vector<const char*> getRequiredExtensions() {
+        std::vector<const char*> extensions;
+
+        uint32_t glfwExtensionCount = 0;
+        const char** glfwExtensions;
+        glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+
+        for (uint32_t i = 0; i < glfwExtensionCount; i++) {
+            extensions.push_back(glfwExtensions[i]);
+        }
+
+        if (enableValidationLayers) {
+            extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+        }
+
+        return extensions;
+    }
+
+    /// Vulkan debug callback @return VK_FALSE
+    static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+        VkDebugReportFlagsEXT flags,
+        VkDebugReportObjectTypeEXT objType,
+        uint64_t obj,
+        size_t location,
+        int32_t code,
+        const char* layerPrefix,
+        const char* msg,
+        void* userData) {
+        HelloTriangleApplication* pMySelf = reinterpret_cast<HelloTriangleApplication*>(userData);
+        if (pMySelf) {
+            pMySelf->debugCallback(flags, objType, obj, location, code, layerPrefix, msg);
+        }
+
+        return VK_FALSE;
+    }
+
+    /// Our member debug callback
+    void debugCallback(
+        VkDebugReportFlagsEXT flags,
+        VkDebugReportObjectTypeEXT objType,
+        uint64_t obj,
+        size_t location,
+        int32_t code,
+        const char* layerPrefix,
+        const char* msg) {
+        std::cerr << "[" << layerPrefix << "] " << msg << std::endl;
+    }
+
+
+    /// Enable Debug callback
+    void setupDebugCallback() {
+        if (enableValidationLayers) {
+            VkDebugReportCallbackCreateInfoEXT createInfo = {};
+            createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
+            createInfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
+            createInfo.pfnCallback = debugCallback;
+            createInfo.pUserData = this;
+
+            if (CreateDebugReportCallbackEXT(instance, &createInfo, nullptr, &callback) != VK_SUCCESS) {
+                throw std::runtime_error("failed to set up debug callback!");
+            }
+        }
+    }
+
     /// Run the application and rendering event loop
     void mainLoop() {
-        std::cout << glfwGetTime() << ": main loop...\n";
+        std::cout << "[Main] running...\n";
         while (!glfwWindowShouldClose(window)) {
             glfwPollEvents();
         }
-        std::cout << glfwGetTime() << ": quitting...\n";
+        std::cout << "[Main] quitting...\n";
     }
 
     /// Cleanup all ressources before closing
     void cleanup() {
+        if (enableValidationLayers) {
+            DestroyDebugReportCallbackEXT(instance, callback, nullptr);
+        }
+
         vkDestroyInstance(instance, nullptr);
 
         glfwDestroyWindow(window);
@@ -110,10 +259,7 @@ private:
     }
 
 private:
-    GLFWwindow* window      = nullptr;  ///< Pointer to the GLWF Window
-    VkInstance  instance    = 0;        ///< Vulkan instance
-
-
-    const int WIDTH = 800;  ///< Width of our window
-    const int HEIGHT = 600; ///< Height of our window
+    GLFWwindow*                 window      = nullptr;      ///< Pointer to the GLWF Window
+    VkInstance                  instance    = 0;            ///< Vulkan instance
+    VkDebugReportCallbackEXT    callback    = 0;            ///< Debug callback
 };
