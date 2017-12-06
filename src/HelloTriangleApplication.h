@@ -141,7 +141,7 @@ private:
         }
     }
 
-    /// @return true  if our Vulkan SDK provides the validation layers we would like to use
+    /// Check if our Vulkan SDK provides the validation layers we would like to use
     // cppcheck-suppress
     bool checkValidationLayerSupport() {
         bool allLayersFound = true;
@@ -173,7 +173,7 @@ private:
         return allLayersFound;
     }
 
-    /// @return List of required Vulkan extensions
+    /// List required Vulkan extensions
     std::vector<const char*> getRequiredExtensions() {
         std::vector<const char*> extensions;
 
@@ -192,7 +192,7 @@ private:
         return extensions;
     }
 
-    /// Vulkan debug callback @return VK_FALSE
+    /// Vulkan debug callback
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
         VkDebugReportFlagsEXT flags,
         VkDebugReportObjectTypeEXT objType,
@@ -262,14 +262,59 @@ private:
         }
     }
 
-    /// @return true if the GPU meets the requirements
+    /// Check if the GPU meets the requirements
     bool isDeviceSuitable(VkPhysicalDevice device) {
         VkPhysicalDeviceProperties deviceProperties;
         VkPhysicalDeviceFeatures deviceFeatures;
         vkGetPhysicalDeviceProperties(device, &deviceProperties);
         vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
-        std::cout << "\t" << deviceProperties.deviceName << " (" << deviceProperties.deviceType << ")\n";
-        return deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
+
+        std::cout << "\t" << deviceProperties.deviceName << " (type " << deviceProperties.deviceType << ")\n";
+
+        QueueFamilyIndices indices = findQueueFamilies(device);
+
+        std::cout << "\t => complete=" << indices.isComplete() << std::endl;
+
+    //  return deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
+        return indices.isComplete();
+    }
+
+    /// Store indicies of queue families we are looking for
+    struct QueueFamilyIndices {
+        int graphicsFamily = -1; ///< Index of the graphic queue family
+
+        /// Check if the device has all required queue families
+        bool isComplete() {
+            return graphicsFamily > -1;
+        }
+    };
+
+    /// Enumerate all queue families to store indices of the one we are looking for
+    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) {
+        QueueFamilyIndices indices;
+
+        uint32_t queueFamilyCount = 0;
+        vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+        std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+        vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+
+        int i = 0;
+        for (const auto& queueFamily : queueFamilies) {
+            std::cout << "\t - queueFamily idx " << i
+                << " queueCount=" << queueFamily.queueCount
+                << " flags=0x" << std::hex << queueFamily.queueFlags << std::endl;
+            if (queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+                indices.graphicsFamily = i;
+            }
+
+            if (indices.isComplete()) {
+                break;
+            }
+
+            i++;
+        }
+
+        return indices;
     }
 
     /// Run the application and rendering event loop
