@@ -118,10 +118,11 @@ option(RUN_CPPCHECK "Run cppcheck C++ static analysis tool." ON)
 if (RUN_CPPCHECK)
     find_program(CPPCHECK_EXECUTABLE NAMES cppcheck)
     if (CPPCHECK_EXECUTABLE)
+        message(STATUS "Using ${CPPCHECK_EXECUTABLE}")
         # add a cppcheck target to the "all" target
         add_custom_target(cppcheck
          ALL
-         COMMAND cppcheck -j 4 --enable=style --suppress=unusedPrivateFunction --quiet ${CPPCHECK_ARG_TEMPLATE} ${PROJECT_SOURCE_DIR}/src
+         COMMAND ${CPPCHECK_EXECUTABLE} -j 4 --enable=style --suppress=unusedPrivateFunction --quiet ${CPPCHECK_ARG_TEMPLATE} ${PROJECT_SOURCE_DIR}/src
         )
     else (CPPCHECK_EXECUTABLE)
         message(STATUS "Could NOT find cppcheck")
