@@ -92,6 +92,7 @@ private:
         createInstance();
         setupDebugCallback();
         pickPhysicalDevice();
+        createLogicalDevice();
     }
 
     /// Create a Vulkan instance
@@ -317,6 +318,43 @@ private:
         return indices;
     }
 
+    /// Create a Logical Device to interact with the GPU through Queues
+    void createLogicalDevice() {
+        std::cout << "[init] Create a Logical Device\n";
+
+        QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+
+        float queuePriority = 1.0f;
+        VkDeviceQueueCreateInfo queueCreateInfo = {};
+        queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        queueCreateInfo.queueFamilyIndex = indices.graphicsFamily;
+        queueCreateInfo.queueCount = 1;
+        queueCreateInfo.pQueuePriorities = &queuePriority;
+
+        VkPhysicalDeviceFeatures deviceFeatures = {};
+        VkDeviceCreateInfo createInfo = {};
+        createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+        createInfo.pQueueCreateInfos = &queueCreateInfo;
+        createInfo.queueCreateInfoCount = 1;
+
+        createInfo.pEnabledFeatures = &deviceFeatures;
+
+        createInfo.enabledExtensionCount = 0;
+
+        if (enableValidationLayers) {
+            createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+            createInfo.ppEnabledLayerNames = validationLayers.data();
+        } else {
+            createInfo.enabledLayerCount = 0;
+        }
+
+        if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create logical device!");
+        }
+
+        vkGetDeviceQueue(device, indices.graphicsFamily, 0, &graphicsQueue);
+    }
+
     /// Run the application and rendering event loop
     void mainLoop() {
         std::cout << "[main] running...\n";
@@ -328,6 +366,8 @@ private:
 
     /// Cleanup all ressources before closing
     void cleanup() {
+        vkDestroyDevice(device, nullptr);
+
         if (enableValidationLayers) {
             DestroyDebugReportCallbackEXT(instance, callback, nullptr);
         }
@@ -342,6 +382,8 @@ private:
 private:
     GLFWwindow*                 window          = nullptr;          ///< Pointer to the GLWF Window
     VkInstance                  instance        = 0;                ///< Vulkan instance
-    VkPhysicalDevice            physicalDevice  = VK_NULL_HANDLE;   ///< GPU
+    VkPhysicalDevice            physicalDevice  = VK_NULL_HANDLE;   ///< Physical Device (GPU)
+    VkDevice                    device          = 0;                ///< Logical Device commands the GPU with Queues
+    VkQueue                     graphicsQueue   = 0;                ///< Queue to communicate with the GPU
     VkDebugReportCallbackEXT    callback        = 0;                ///< Debug callback
 };
