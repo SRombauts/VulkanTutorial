@@ -80,7 +80,7 @@ private:
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-        std::cout << "[Init] Create a " << WIDTH << " x " << HEIGHT << " window\n";
+        std::cout << "[init] Create a " << WIDTH << " x " << HEIGHT << " window\n";
         window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
         if (!window) {
             throw std::runtime_error("Cannot create the Window");
@@ -91,6 +91,7 @@ private:
     void initVulkan() {
         createInstance();
         setupDebugCallback();
+        pickPhysicalDevice();
     }
 
     /// Create a Vulkan instance
@@ -104,7 +105,7 @@ private:
         std::vector<VkExtensionProperties> extensions(extensionCount);
         vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
 
-        std::cout << "[Init] There are " << extensionCount << " available Vulkan extensions:\n";
+        std::cout << "[init] There are " << extensionCount << " available Vulkan extensions:\n";
         for (const auto& extension : extensions) {
             std::cout << "\t" << extension.extensionName << std::endl;
         }
@@ -118,7 +119,7 @@ private:
         appInfo.apiVersion = VK_API_VERSION_1_0;
 
         const auto requiredExtensions = getRequiredExtensions();
-        std::cout << "[Init] GLFW requires the following " << requiredExtensions.size() << " extensions:\n";
+        std::cout << "[init] GLFW requires the following " << requiredExtensions.size() << " extensions:\n";
         for (const auto& requiredExtension : requiredExtensions) {
             std::cout << "\t" << requiredExtension << std::endl;
         }
@@ -141,13 +142,14 @@ private:
     }
 
     /// @return true  if our Vulkan SDK provides the validation layers we would like to use
+    // cppcheck-suppress
     bool checkValidationLayerSupport() {
         bool allLayersFound = true;
         uint32_t layerCount;
         vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
         std::vector<VkLayerProperties> availableLayers(layerCount);
         vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
-        std::cout << "[Init] There are " << layerCount << " available validation layers:\n";
+        std::cout << "[init] There are " << layerCount << " available validation layers:\n";
         for (const auto& layer : availableLayers) {
             std::cout << "\t" << layer.layerName << std::endl;
         }
@@ -220,7 +222,6 @@ private:
         std::cerr << "[" << layerPrefix << "] " << msg << std::endl;
     }
 
-
     /// Enable Debug callback
     void setupDebugCallback() {
         if (enableValidationLayers) {
@@ -236,13 +237,48 @@ private:
         }
     }
 
+    /// Select the first GPU that meets the requirements
+    void pickPhysicalDevice() {
+        uint32_t deviceCount = 0;
+        vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
+
+        if (deviceCount == 0) {
+            throw std::runtime_error("failed to find GPUs with Vulkan support!");
+        }
+
+        std::vector<VkPhysicalDevice> devices(deviceCount);
+        vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
+
+        std::cout << "[init] There are " << deviceCount << " available physical device(s):\n";
+        for (const auto& device : devices) {
+            if (isDeviceSuitable(device)) {
+                physicalDevice = device;
+                break;
+            }
+        }
+
+        if (physicalDevice == VK_NULL_HANDLE) {
+            throw std::runtime_error("failed to find a suitable GPU!");
+        }
+    }
+
+    /// @return true if the GPU meets the requirements
+    bool isDeviceSuitable(VkPhysicalDevice device) {
+        VkPhysicalDeviceProperties deviceProperties;
+        VkPhysicalDeviceFeatures deviceFeatures;
+        vkGetPhysicalDeviceProperties(device, &deviceProperties);
+        vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
+        std::cout << "\t" << deviceProperties.deviceName << " (" << deviceProperties.deviceType << ")\n";
+        return deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
+    }
+
     /// Run the application and rendering event loop
     void mainLoop() {
-        std::cout << "[Main] running...\n";
+        std::cout << "[main] running...\n";
         while (!glfwWindowShouldClose(window)) {
             glfwPollEvents();
         }
-        std::cout << "[Main] quitting...\n";
+        std::cout << "[main] quitting...\n";
     }
 
     /// Cleanup all ressources before closing
@@ -259,7 +295,8 @@ private:
     }
 
 private:
-    GLFWwindow*                 window      = nullptr;      ///< Pointer to the GLWF Window
-    VkInstance                  instance    = 0;            ///< Vulkan instance
-    VkDebugReportCallbackEXT    callback    = 0;            ///< Debug callback
+    GLFWwindow*                 window          = nullptr;          ///< Pointer to the GLWF Window
+    VkInstance                  instance        = 0;                ///< Vulkan instance
+    VkPhysicalDevice            physicalDevice  = VK_NULL_HANDLE;   ///< GPU
+    VkDebugReportCallbackEXT    callback        = 0;                ///< Debug callback
 };
