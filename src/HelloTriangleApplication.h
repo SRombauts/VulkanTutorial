@@ -91,6 +91,7 @@ private:
     void initVulkan() {
         createInstance();
         setupDebugCallback();
+        createSurface();
         pickPhysicalDevice();
         createLogicalDevice();
     }
@@ -238,6 +239,13 @@ private:
         }
     }
 
+    /// Create the abstract surface to present the rendered image
+    void createSurface() {
+        if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create window surface!");
+        }
+    }
+
     /// Select the first GPU that meets the requirements
     void pickPhysicalDevice() {
         uint32_t deviceCount = 0;
@@ -282,7 +290,7 @@ private:
 
     /// Store indicies of queue families we are looking for
     struct QueueFamilyIndices {
-        int graphicsFamily = -1; ///< Index of the graphic queue family
+        int graphicsFamily = -1;   ///< Index of the graphic queue family (to render images)
 
         /// Check if the device has all required queue families
         bool isComplete() {
@@ -372,6 +380,7 @@ private:
             DestroyDebugReportCallbackEXT(instance, callback, nullptr);
         }
 
+        vkDestroySurfaceKHR(instance, surface, nullptr);
         vkDestroyInstance(instance, nullptr);
 
         glfwDestroyWindow(window);
@@ -382,8 +391,9 @@ private:
 private:
     GLFWwindow*                 window          = nullptr;          ///< Pointer to the GLWF Window
     VkInstance                  instance        = 0;                ///< Vulkan instance
+    VkDebugReportCallbackEXT    callback        = 0;                ///< Debug callback
+    VkSurfaceKHR                surface         = 0;                ///< Abstract surface to prense the rendered image
     VkPhysicalDevice            physicalDevice  = VK_NULL_HANDLE;   ///< Physical Device (GPU)
     VkDevice                    device          = 0;                ///< Logical Device commands the GPU with Queues
     VkQueue                     graphicsQueue   = 0;                ///< Queue to communicate with the GPU
-    VkDebugReportCallbackEXT    callback        = 0;                ///< Debug callback
 };
