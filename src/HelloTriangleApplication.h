@@ -16,7 +16,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <vector>
-#include <functional>
+#include <set>
 #include <cstring>
 
 const int WIDTH = 800;  ///< Width of our window
@@ -290,11 +290,12 @@ private:
 
     /// Store indicies of queue families we are looking for
     struct QueueFamilyIndices {
-        int graphicsFamily = -1;   ///< Index of the graphic queue family (to render images)
+        int graphicsFamily  = -1;   ///< Index of the graphic queue family (to render images)
+        int presentFamily   = -1;   ///< Index of the prensentation queue family (to present rendered images)
 
         /// Check if the device has all required queue families
         bool isComplete() {
-            return graphicsFamily > -1;
+            return (graphicsFamily > -1) && (presentFamily > -1);
         }
     };
 
@@ -316,6 +317,12 @@ private:
                 indices.graphicsFamily = i;
             }
 
+            VkBool32 presentSupport = false;
+            vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
+            if (queueFamily.queueCount > 0 && presentSupport) {
+                indices.presentFamily = i;
+            }
+
             if (indices.isComplete()) {
                 break;
             }
@@ -328,22 +335,29 @@ private:
 
     /// Create a Logical Device to interact with the GPU through Queues
     void createLogicalDevice() {
-        std::cout << "[init] Create a Logical Device\n";
+        std::cout << "[init] Create a Logical Device with Queues\n";
 
         QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
 
+        std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+        std::set<int> uniqueQueueFamilies = { indices.graphicsFamily, indices.presentFamily };
+
         float queuePriority = 1.0f;
-        VkDeviceQueueCreateInfo queueCreateInfo = {};
-        queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-        queueCreateInfo.queueFamilyIndex = indices.graphicsFamily;
-        queueCreateInfo.queueCount = 1;
-        queueCreateInfo.pQueuePriorities = &queuePriority;
+        for (int queueFamily : uniqueQueueFamilies) {
+            std::cout << "\t queueFamily=" << queueFamily << std::endl;
+            VkDeviceQueueCreateInfo queueCreateInfo = {};
+            queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+            queueCreateInfo.queueFamilyIndex = queueFamily;
+            queueCreateInfo.queueCount = 1;
+            queueCreateInfo.pQueuePriorities = &queuePriority;
+            queueCreateInfos.push_back(queueCreateInfo);
+        }
 
         VkPhysicalDeviceFeatures deviceFeatures = {};
         VkDeviceCreateInfo createInfo = {};
         createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-        createInfo.pQueueCreateInfos = &queueCreateInfo;
-        createInfo.queueCreateInfoCount = 1;
+        createInfo.queueCreateInfoCount = queueCreateInfos.size();
+        createInfo.pQueueCreateInfos = queueCreateInfos.data();
 
         createInfo.pEnabledFeatures = &deviceFeatures;
 
@@ -361,6 +375,7 @@ private:
         }
 
         vkGetDeviceQueue(device, indices.graphicsFamily, 0, &graphicsQueue);
+        vkGetDeviceQueue(device, indices.presentFamily,  0, &presentQueue);
     }
 
     /// Run the application and rendering event loop
@@ -396,4 +411,5 @@ private:
     VkPhysicalDevice            physicalDevice  = VK_NULL_HANDLE;   ///< Physical Device (GPU)
     VkDevice                    device          = 0;                ///< Logical Device commands the GPU with Queues
     VkQueue                     graphicsQueue   = 0;                ///< Queue to communicate with the GPU
+    VkQueue                     presentQueue    = 0;                ///< Queue to present the rendered image
 };
