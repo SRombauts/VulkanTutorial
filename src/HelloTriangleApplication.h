@@ -18,6 +18,7 @@
 #include <vector>
 #include <set>
 #include <cstring>
+#include <string>
 
 const int WIDTH = 800;  ///< Width of our window
 const int HEIGHT = 600; ///< Height of our window
@@ -29,9 +30,14 @@ const bool enableValidationLayers = false;
 const bool enableValidationLayers = true;
 #endif
 
-/// Names of validation layers that we would like to enable
+/// Names of validation layers that we would like to enable in Debug mode
 const std::vector<const char*> validationLayers = {
     "VK_LAYER_LUNARG_standard_validation"
+};
+
+/// Names of extensions that we need to enable
+const std::vector<const char*> deviceExtensions = {
+    VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
 
 /// Load the Debug callback extension and call it to register our callback
@@ -107,7 +113,7 @@ private:
         std::vector<VkExtensionProperties> extensions(extensionCount);
         vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
 
-        std::cout << "[init] There are " << extensionCount << " available Vulkan extensions:\n";
+        std::cout << "[init] There are " << extensionCount << " available Instance extensions:\n";
         for (const auto& extension : extensions) {
             std::cout << "\t" << extension.extensionName << std::endl;
         }
@@ -259,9 +265,9 @@ private:
         vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
 
         std::cout << "[init] There are " << deviceCount << " available physical device(s):\n";
-        for (const auto& device : devices) {
-            if (isDeviceSuitable(device)) {
-                physicalDevice = device;
+        for (const auto& dev : devices) {
+            if (isDeviceSuitable(dev)) {
+                physicalDevice = dev;
                 break;
             }
         }
@@ -272,20 +278,22 @@ private:
     }
 
     /// Check if the GPU meets the requirements
-    bool isDeviceSuitable(VkPhysicalDevice device) {
+    bool isDeviceSuitable(VkPhysicalDevice dev) {
         VkPhysicalDeviceProperties deviceProperties;
         VkPhysicalDeviceFeatures deviceFeatures;
-        vkGetPhysicalDeviceProperties(device, &deviceProperties);
-        vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
+        vkGetPhysicalDeviceProperties(dev, &deviceProperties);
+        vkGetPhysicalDeviceFeatures(dev, &deviceFeatures);
 
         std::cout << "\t" << deviceProperties.deviceName << " (type " << deviceProperties.deviceType << ")\n";
 
-        QueueFamilyIndices indices = findQueueFamilies(device);
+        const QueueFamilyIndices indices = findQueueFamilies(dev);
 
         std::cout << "\t => complete=" << indices.isComplete() << std::endl;
 
+        const bool extensionsSupported = checkDeviceExtensionSupport(dev);
+
     //  return deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
-        return indices.isComplete();
+        return indices.isComplete() && extensionsSupported;
     }
 
     /// Store indicies of queue families we are looking for
@@ -294,31 +302,31 @@ private:
         int presentFamily   = -1;   ///< Index of the prensentation queue family (to present rendered images)
 
         /// Check if the device has all required queue families
-        bool isComplete() {
+        bool isComplete() const {
             return (graphicsFamily > -1) && (presentFamily > -1);
         }
     };
 
     /// Enumerate all queue families to store indices of the one we are looking for
-    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) {
+    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice dev) {
         QueueFamilyIndices indices;
 
         uint32_t queueFamilyCount = 0;
-        vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+        vkGetPhysicalDeviceQueueFamilyProperties(dev, &queueFamilyCount, nullptr);
         std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-        vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+        vkGetPhysicalDeviceQueueFamilyProperties(dev, &queueFamilyCount, queueFamilies.data());
 
         int i = 0;
         for (const auto& queueFamily : queueFamilies) {
             std::cout << "\t - queueFamily idx " << i
                 << " queueCount=" << queueFamily.queueCount
-                << " flags=0x" << std::hex << queueFamily.queueFlags << std::endl;
+                << " flags=0x" << std::hex << queueFamily.queueFlags << std::dec << std::endl;
             if (queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
                 indices.graphicsFamily = i;
             }
 
             VkBool32 presentSupport = false;
-            vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
+            vkGetPhysicalDeviceSurfaceSupportKHR(dev, i, surface, &presentSupport);
             if (queueFamily.queueCount > 0 && presentSupport) {
                 indices.presentFamily = i;
             }
@@ -331,6 +339,29 @@ private:
         }
 
         return indices;
+    }
+
+    /// Check that all required extensions are supported
+    bool checkDeviceExtensionSupport(VkPhysicalDevice device) {
+        uint32_t extensionCount;
+        vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
+
+        std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+        vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
+
+        std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
+        std::cout << "[init] We require the following " << extensionCount << " Device extensions:\n";
+        for (const auto& extension : requiredExtensions) {
+            std::cout << "\t" << extension << std::endl;
+        }
+
+        std::cout << "[init] There are " << extensionCount << " available Device extensions:\n";
+        for (const auto& extension : availableExtensions) {
+            std::cout << "\t" << extension.extensionName << std::endl;
+            requiredExtensions.erase(extension.extensionName);
+        }
+
+        return requiredExtensions.empty();
     }
 
     /// Create a Logical Device to interact with the GPU through Queues
@@ -360,8 +391,8 @@ private:
         createInfo.pQueueCreateInfos = queueCreateInfos.data();
 
         createInfo.pEnabledFeatures = &deviceFeatures;
-
-        createInfo.enabledExtensionCount = 0;
+        createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
+        createInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
         if (enableValidationLayers) {
             createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
