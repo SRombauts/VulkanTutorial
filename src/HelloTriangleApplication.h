@@ -292,8 +292,14 @@ private:
 
         const bool extensionsSupported = checkDeviceExtensionSupport(dev);
 
+        bool swapChainAdequate = false;
+        if (extensionsSupported) {
+            SwapChainSupportDetails swapChainSupport = querySwapChainSupport(dev);
+            swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
+        }
+
     //  return deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
-        return indices.isComplete() && extensionsSupported;
+        return indices.isComplete() && extensionsSupported && swapChainAdequate;
     }
 
     /// Store indicies of queue families we are looking for
@@ -362,6 +368,60 @@ private:
         }
 
         return requiredExtensions.empty();
+    }
+
+    /// Swapchain support details (capabilites, formats and presentation modes)
+    struct SwapChainSupportDetails {
+        VkSurfaceCapabilitiesKHR        capabilities; ///< Surface (min/max number of images, min/max width and height)
+        std::vector<VkSurfaceFormatKHR> formats;      ///< Surface formats (pixel format, color space)
+        std::vector<VkPresentModeKHR>   presentModes; ///< Available presentation modes
+    };
+
+    /// Get swapchain support details
+    SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice def) {
+        SwapChainSupportDetails details;
+
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(def, surface, &details.capabilities);
+
+        uint32_t formatCount;
+        vkGetPhysicalDeviceSurfaceFormatsKHR(def, surface, &formatCount, nullptr);
+
+        if (formatCount != 0) {
+            details.formats.resize(formatCount);
+            vkGetPhysicalDeviceSurfaceFormatsKHR(def, surface, &formatCount, details.formats.data());
+
+            std::cout << "[init] There are " << formatCount << " available surface formats\n";
+        }
+
+        uint32_t presentModeCount;
+        vkGetPhysicalDeviceSurfacePresentModesKHR(def, surface, &presentModeCount, nullptr);
+
+        if (presentModeCount != 0) {
+            details.presentModes.resize(presentModeCount);
+            vkGetPhysicalDeviceSurfacePresentModesKHR(def, surface, &presentModeCount, details.presentModes.data());
+
+            std::cout << "[init] There are " << presentModeCount << " available presentation modes\n";
+        }
+
+        return details;
+    }
+
+    /// Select best possible surface format for the swapchain
+    VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
+        if (availableFormats.size() == 1 && availableFormats[0].format == VK_FORMAT_UNDEFINED) {
+            std::cout << "[init] We are free to choose the surface format: using B8G8R8A8 SRGB NONLINEAR\n";
+            return { VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
+        }
+
+        for (const auto& availableFormat : availableFormats) {
+            if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+                std::cout << "[init] We have found our prefered surface format: B8G8R8A8 SRGB NONLINEAR\n";
+                return availableFormat;
+            }
+        }
+
+        std::cout << "[init] Just using the first surface format\n";
+        return availableFormats[0];
     }
 
     /// Create a Logical Device to interact with the GPU through Queues
