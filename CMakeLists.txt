@@ -37,7 +37,7 @@ else (MSVC)
      # GCC/Clang flags
     add_compile_options(-rdynamic -fstack-protector)
 endif (MSVC)
-set(CPPLINT_ARG_LINELENGTH "--linelength=120")
+set(CPPLINT_ARG_LINELENGTH "--linelength=140")
 set(CPPLINT_ARG_VERBOSE    "--verbose=1")
 
 

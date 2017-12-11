@@ -19,6 +19,8 @@
 #include <set>
 #include <cstring>
 #include <string>
+#include <limits>
+#include <algorithm>
 
 const int WIDTH = 800;  ///< Width of our window
 const int HEIGHT = 600; ///< Height of our window
@@ -100,6 +102,7 @@ private:
         createSurface();
         pickPhysicalDevice();
         createLogicalDevice();
+        createSwapChain();
     }
 
     /// Create a Vulkan instance
@@ -406,24 +409,6 @@ private:
         return details;
     }
 
-    /// Select best possible surface format for the swapchain
-    VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
-        if (availableFormats.size() == 1 && availableFormats[0].format == VK_FORMAT_UNDEFINED) {
-            std::cout << "[init] We are free to choose the surface format: using B8G8R8A8 SRGB NONLINEAR\n";
-            return { VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
-        }
-
-        for (const auto& availableFormat : availableFormats) {
-            if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-                std::cout << "[init] We have found our prefered surface format: B8G8R8A8 SRGB NONLINEAR\n";
-                return availableFormat;
-            }
-        }
-
-        std::cout << "[init] Just using the first surface format\n";
-        return availableFormats[0];
-    }
-
     /// Create a Logical Device to interact with the GPU through Queues
     void createLogicalDevice() {
         std::cout << "[init] Create a Logical Device with Queues\n";
@@ -469,6 +454,121 @@ private:
         vkGetDeviceQueue(device, indices.presentFamily,  0, &presentQueue);
     }
 
+    /// Create the swapchain
+    void createSwapChain() {
+        const SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice);
+
+        const VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
+        const VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
+        swapChainExtent = chooseSwapExtent(swapChainSupport.capabilities);
+        std::cout << "[init] SwapExtent " << swapChainExtent.width << "x" << swapChainExtent.height << std::endl;
+
+        // The implementation specifies the minimum amount of images, but we will try with one more to implement triple buffering.
+        uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
+        if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount) {
+            imageCount = swapChainSupport.capabilities.maxImageCount;
+        }
+        std::cout << "[init] Swapchain imageCount " << imageCount << std::endl;
+
+        VkSwapchainCreateInfoKHR createInfo = {};
+        createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+        createInfo.surface = surface;
+        createInfo.minImageCount = imageCount;
+        createInfo.imageFormat = surfaceFormat.format;
+        createInfo.imageColorSpace = surfaceFormat.colorSpace;
+        createInfo.imageExtent = swapChainExtent;
+        createInfo.imageArrayLayers = 1;
+        createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+        QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+        uint32_t queueFamilyIndices[] = { (uint32_t)indices.graphicsFamily, (uint32_t)indices.presentFamily };
+
+        if (indices.graphicsFamily != indices.presentFamily) {
+            std::cout << "[init] imageSharingMode CONCURRENT\n";
+            createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+            createInfo.queueFamilyIndexCount = 2;
+            createInfo.pQueueFamilyIndices = queueFamilyIndices;
+        } else {
+            std::cout << "[init] imageSharingMode EXCLUSIVE\n";
+            createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+            createInfo.queueFamilyIndexCount = 0; // Optional
+            createInfo.pQueueFamilyIndices = nullptr; // Optional
+        }
+
+        createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
+        createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+        createInfo.presentMode = presentMode;
+        createInfo.clipped = VK_TRUE;
+        createInfo.oldSwapchain = VK_NULL_HANDLE;
+
+        if (vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapChain) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create swap chain!");
+        }
+
+        vkGetSwapchainImagesKHR(device, swapChain, &imageCount, nullptr);
+        swapChainImages.resize(imageCount);
+        vkGetSwapchainImagesKHR(device, swapChain, &imageCount, swapChainImages.data());
+
+        swapChainImageFormat = surfaceFormat.format;
+    }
+
+    /// Select best possible surface format for the swapchain
+    VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
+        if (availableFormats.size() == 1 && availableFormats[0].format == VK_FORMAT_UNDEFINED) {
+            std::cout << "[init] We are free to choose the surface format: using B8G8R8A8 SRGB NONLINEAR\n";
+            return { VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
+        }
+
+        for (const auto& availableFormat : availableFormats) {
+            if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM &&
+                availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+                std::cout << "[init] We have found our prefered surface format: B8G8R8A8 SRGB NONLINEAR\n";
+                return availableFormat;
+            }
+        }
+
+        std::cout << "[init] Just using the first surface format\n";
+        return availableFormats[0];
+    }
+
+    /// Chose presentation swap-mode (ie immediate, tripple buffering...)
+    VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes) {
+        VkPresentModeKHR bestMode = VK_PRESENT_MODE_FIFO_KHR;
+
+        for (const auto& availablePresentMode : availablePresentModes) {
+            if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
+                std::cout << "[init] We have found desired presentation mode MAILBOX\n";
+                return availablePresentMode;
+            }  else if (availablePresentMode == VK_PRESENT_MODE_IMMEDIATE_KHR) {
+                bestMode = availablePresentMode;
+            }
+        }
+
+        if (bestMode == VK_PRESENT_MODE_FIFO_KHR) {
+            std::cout << "[init] Defaulted to presentation mode FIFO\n";
+        } else {
+            std::cout << "[init] Defaulted to presentation mode IMMEDIATE\n";
+        }
+
+        return bestMode;
+    }
+
+    /// Choose resolution of images to be stored and presented by the swapchain
+    VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {
+        if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
+            return capabilities.currentExtent;
+        } else {
+            VkExtent2D actualExtent = { WIDTH, HEIGHT };
+
+            actualExtent.width = std::max(capabilities.minImageExtent.width,
+                std::min(capabilities.maxImageExtent.width, actualExtent.width));
+            actualExtent.height = std::max(capabilities.minImageExtent.height,
+                std::min(capabilities.maxImageExtent.height, actualExtent.height));
+
+            return actualExtent;
+        }
+    }
+
     /// Run the application and rendering event loop
     void mainLoop() {
         std::cout << "[main] running...\n";
@@ -480,6 +580,8 @@ private:
 
     /// Cleanup all ressources before closing
     void cleanup() {
+        vkDestroySwapchainKHR(device, swapChain, nullptr);
+
         vkDestroyDevice(device, nullptr);
 
         if (enableValidationLayers) {
@@ -503,4 +605,8 @@ private:
     VkDevice                    device          = 0;                ///< Logical Device commands the GPU with Queues
     VkQueue                     graphicsQueue   = 0;                ///< Queue to communicate with the GPU
     VkQueue                     presentQueue    = 0;                ///< Queue to present the rendered image
+    VkSwapchainKHR              swapChain       = 0;                ///< The swapchain
+    std::vector<VkImage>        swapChainImages;                    ///< Handles to the images of the swapchain
+    VkFormat                    swapChainImageFormat;               ///< Image format
+    VkExtent2D                  swapChainExtent;                    ///< Image dimension
 };
