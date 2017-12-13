@@ -42,6 +42,9 @@ if(WIN32)
         "$ENV{VULKAN_SDK}/Lib"
         "$ENV{VULKAN_SDK}/Bin"
         )
+    find_program(GLSLANG_VALIDATOR
+      NAMES glslangValidator
+      HINTS "$ENV{VULKAN_SDK}/Bin")
   elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
     find_library(Vulkan_LIBRARY
       NAMES vulkan-1
@@ -50,6 +53,9 @@ if(WIN32)
         "$ENV{VULKAN_SDK}/Bin32"
         NO_SYSTEM_ENVIRONMENT_PATH
         )
+    find_program(GLSLANG_VALIDATOR
+      NAMES glslangValidator
+      HINTS "$ENV{VULKAN_SDK}/Bin32")
   endif()
 else()
     find_path(Vulkan_INCLUDE_DIR
@@ -60,6 +66,9 @@ else()
       NAMES vulkan
       PATHS
         "$ENV{VULKAN_SDK}/lib")
+    find_program(GLSLANG_VALIDATOR
+      NAMES glslangValidator
+      HINTS "$ENV{VULKAN_SDK}/bin")
 endif()
 
 set(Vulkan_LIBRARIES ${Vulkan_LIBRARY})

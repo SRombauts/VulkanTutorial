@@ -47,7 +47,7 @@ find_package(Vulkan)
 if (NOT VULKAN_FOUND)
     message(FATAL_ERROR "Could not find Vulkan library!")
 else ()
-    message(STATUS "Vulkan_INCLUDE_DIRS: '${Vulkan_INCLUDE_DIRS}' Vulkan_LIBRARIES: '${Vulkan_LIBRARIES}'" )
+    message(STATUS "Vulkan_INCLUDE_DIRS: '${Vulkan_INCLUDE_DIRS}' Vulkan_LIBRARIES: '${Vulkan_LIBRARIES}' Vulkan_GLSLANG_VALIDATOR : '${Vulkan_GLSLANG_VALIDATOR}'" )
 endif ()
 include_directories(SYSTEM ${Vulkan_INCLUDE_DIRS})
 
@@ -84,6 +84,7 @@ set(script_files
  ${CMAKE_SOURCE_DIR}/build.bat
  ${CMAKE_SOURCE_DIR}/build.sh
  ${CMAKE_SOURCE_DIR}/Doxyfile
+ ${CMAKE_SOURCE_DIR}/cmake/FindVulkan.cmake
 )
 source_group(scripts  FILES ${script_files})
 
