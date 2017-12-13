@@ -70,6 +70,13 @@ set(source_files
 )
 source_group(src      FILES ${source_files})
 
+# List all shader files
+set(shader_files
+ ${CMAKE_SOURCE_DIR}/shaders/shader.vert
+ ${CMAKE_SOURCE_DIR}/shaders/shader.frag
+)
+source_group(shaders  FILES ${shader_files})
+
 # List script files
 set(script_files
  ${CMAKE_SOURCE_DIR}/.travis.yml
@@ -88,7 +95,7 @@ set(doc_files
 source_group(doc      FILES ${doc_files})
 
 # add the application executable
-add_executable(VulkanTutorial ${source_files} ${doc_files} ${script_files} ${examples_files})
+add_executable(VulkanTutorial ${source_files} ${doc_files} ${script_files} ${examples_files}  ${shader_files})
 target_link_libraries(VulkanTutorial ${glfw_LIBRARIES} ${Vulkan_LIBRARIES})
 
 
