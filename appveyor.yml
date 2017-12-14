@@ -22,6 +22,14 @@ before_build:
   - cd build
   - cmake ..
 
-# build example
+# build example in default Debug configuration
 build_script:
   - cmake --build .
+
+after_build:
+  - cd build\Debug
+  - 7z a VulkanTutorialDebug.zip VulkanTutorial.exe shaders\*
+
+artifacts:
+  - path: build\Debug\VulkanTutorialDebug.zip
+    name: VulkanTutorialDebug
