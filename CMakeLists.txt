@@ -47,7 +47,7 @@ find_package(Vulkan)
 if (NOT VULKAN_FOUND)
     message(FATAL_ERROR "Could not find Vulkan library!")
 else ()
-    message(STATUS "Vulkan_INCLUDE_DIRS: '${Vulkan_INCLUDE_DIRS}' Vulkan_LIBRARIES: '${Vulkan_LIBRARIES}' Vulkan_GLSLANG_VALIDATOR : '${Vulkan_GLSLANG_VALIDATOR}'" )
+    message(STATUS "Vulkan_INCLUDE_DIRS: '${Vulkan_INCLUDE_DIRS}' Vulkan_LIBRARIES: '${Vulkan_LIBRARIES}' GLSLANG_VALIDATOR : '${GLSLANG_VALIDATOR}'" )
 endif ()
 include_directories(SYSTEM ${Vulkan_INCLUDE_DIRS})
 
@@ -99,6 +99,34 @@ source_group(doc      FILES ${doc_files})
 add_executable(VulkanTutorial ${source_files} ${doc_files} ${script_files} ${examples_files}  ${shader_files})
 target_link_libraries(VulkanTutorial ${glfw_LIBRARIES} ${Vulkan_LIBRARIES})
 
+# compile shaders
+foreach(GLSL ${shader_files})
+  get_filename_component(FILE_NAME ${GLSL} NAME)
+  set(SPIRV "${PROJECT_BINARY_DIR}/shaders/${FILE_NAME}.spv")
+  add_custom_command(
+    OUTPUT ${SPIRV}
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${PROJECT_BINARY_DIR}/shaders/"
+    COMMAND ${GLSLANG_VALIDATOR} -V ${GLSL} -o ${SPIRV}
+    DEPENDS ${GLSL}
+    COMMENT "Compiling shader file: ${GLSLANG_VALIDATOR} -V ${GLSL} -o ${SPIRV}"
+   )
+  list(APPEND SPIRV_BINARY_FILES ${SPIRV})
+endforeach(GLSL)
+
+add_custom_target(
+    Shaders 
+    DEPENDS ${SPIRV_BINARY_FILES}
+)
+
+add_dependencies(VulkanTutorial Shaders)
+
+add_custom_command(TARGET VulkanTutorial POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:VulkanTutorial>/shaders/"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${PROJECT_BINARY_DIR}/shaders"
+        "$<TARGET_FILE_DIR:VulkanTutorial>/shaders"
+    COMMENT "Copying binary shaders to $<TARGET_FILE_DIR:VulkanTutorial>/shaders"
+ )
 
 # Optional additional targets:
 
