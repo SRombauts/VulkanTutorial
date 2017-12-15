@@ -600,13 +600,61 @@ private:
 
     /// Create the pipeline
     void createGraphicsPipeline() {
+        // Programable stages:
         const auto vertShaderCode = readFile("shaders/shader.vert.spv");
         const auto fragShaderCode = readFile("shaders/shader.frag.spv");
 
         const VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
         const VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
 
-        // TODO(SRombauts) Create Pipeline
+        VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
+        vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+        vertShaderStageInfo.module = vertShaderModule;
+        vertShaderStageInfo.pName = "main";
+
+        VkPipelineShaderStageCreateInfo fragShaderStageInfo = {};
+        fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+        fragShaderStageInfo.module = fragShaderModule;
+        fragShaderStageInfo.pName = "main";
+
+        const VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
+
+        // Static configurable stages:
+        // Vertex Input (no use since we use hard-coded in-shader vertices)
+        VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
+        vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+        vertexInputInfo.vertexBindingDescriptionCount = 0;
+        vertexInputInfo.pVertexBindingDescriptions = nullptr; // Optional
+        vertexInputInfo.vertexAttributeDescriptionCount = 0;
+        vertexInputInfo.pVertexAttributeDescriptions = nullptr; // Optional
+
+        // We only use the triangle topology for now
+        VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
+        inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+        inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+        // Viewport
+        VkViewport viewport = {};
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+        viewport.width = static_cast<float>(swapChainExtent.width);
+        viewport.height = static_cast<float>(swapChainExtent.height);
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+
+        VkRect2D scissor = {};
+        scissor.offset = {0, 0};
+        scissor.extent = swapChainExtent;
+
+        VkPipelineViewportStateCreateInfo viewportState = {};
+        viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+        viewportState.viewportCount = 1;
+        viewportState.pViewports = &viewport;
+        viewportState.scissorCount = 1;
+        viewportState.pScissors = &scissor;
 
         vkDestroyShaderModule(device, fragShaderModule, nullptr);
         vkDestroyShaderModule(device, vertShaderModule, nullptr);
@@ -684,7 +732,7 @@ private:
     VkQueue                     presentQueue    = 0;                ///< Queue to present the rendered image
     VkSwapchainKHR              swapChain       = 0;                ///< The swapchain
     std::vector<VkImage>        swapChainImages;                    ///< Handles to the images of the swapchain
-    VkFormat                    swapChainImageFormat;               ///< Image format
-    VkExtent2D                  swapChainExtent;                    ///< Image dimension
+    VkFormat                    swapChainImageFormat = VK_FORMAT_UNDEFINED; ///< Image format
+    VkExtent2D                  swapChainExtent = {};               ///< Image dimension
     std::vector<VkImageView>    swapChainImageViews;                ///< Image views of the swapchain
 };
